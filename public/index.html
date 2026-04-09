@@ -3,112 +3,343 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SRMIST Intelligent Navigator</title>
-    <!-- Modern Typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
+    <meta name="description" content="SmartRoute SRMIST — Agentic AI Route Optimizer with Reinforcement Learning for SRMIST KTR Campus">
+    <title>SmartRoute SRMIST — Agentic AI v4</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="background-accents">
-        <div class="blob blob1"></div>
-        <div class="blob blob2"></div>
-    </div>
 
-    <main class="dashboard-layout">
-        <div class="left-panel">
-            <header>
-                <h1>SmartRoute <span class="gradient-text">SRMIST</span></h1>
-                <p>Advanced AI-Powered Routing Engine</p>
-            </header>
+    <!-- ═══ Top Navigation Bar ═══ -->
+    <nav class="topbar">
+        <div class="topbar-left">
+            <span class="logo-icon">🧠</span>
+            <span class="logo-text">SmartRoute SRMIST</span>
+            <span class="version-badge">Agentic AI v4</span>
+        </div>
+        <div class="topbar-tabs">
+            <button class="tab active" data-tab="planner">🗺️ Planner</button>
+            <button class="tab" data-tab="srmist">🏛️ SRMIST</button>
+            <button class="tab" data-tab="dashboard">📊 Dashboard</button>
+        </div>
+        <div class="topbar-right">
+            <button class="topbar-btn danger" id="emergencyBtn">⚡ Emergency Replan</button>
+            <button class="topbar-btn accent" id="themeToggle">🌙 Dark Mode</button>
+            <button class="topbar-btn primary" id="openQTable">🧬 Neural Core</button>
+            <button class="topbar-btn icon-btn" title="Settings">⚙️</button>
+        </div>
+    </nav>
 
-            <section class="card control-pannel">
-                <div class="input-group">
-                    <label for="startNode">Origin</label>
-                    <select id="startNode">
-                        <option value="" disabled selected>Loading hubs...</option>
-                    </select>
+    <!-- ═══════════════════════════════════════════════════
+         TAB 1: PLANNER VIEW
+         ═══════════════════════════════════════════════════ -->
+    <div class="view active" id="plannerView">
+        <aside class="sidebar sidebar-left">
+            <div class="card">
+                <h3>🗺️ Plan Your Route</h3>
+                <label>📍 Origin</label>
+                <div class="input-row">
+                    <select id="startNode"><option value="" disabled selected>e.g. SRM Main Gate...</option></select>
                 </div>
-
-                <div class="input-group">
-                    <label for="endNode">Destination</label>
-                    <select id="endNode">
-                        <option value="" disabled selected>Loading hubs...</option>
-                    </select>
+                <label>🏁 Destination</label>
+                <div class="input-row">
+                    <select id="endNode"><option value="" disabled selected>e.g. Tech Park...</option></select>
                 </div>
+                <label>⚡ Optimization Strategy</label>
+                <select id="preference"><option value="" disabled selected>Select strategy...</option></select>
 
-                <div class="input-group">
-                    <label for="preference">Routing Preference</label>
-                    <select id="preference">
-                        <option value="" disabled selected>Loading preferences...</option>
-                    </select>
+                <button class="btn-generate" id="computeBtn">🤖 Generate AI Route</button>
+                <p class="connected-label">✅ Connected — 7 Agents · SmartRoute SRMIST<br>Agentic AI + RL</p>
+
+                <div id="terminal" class="terminal hidden">
+                    <p id="termLine">Initializing...</p>
                 </div>
+            </div>
 
-                <button id="calculateBtn" class="primary-btn">Compute Neural Route</button>
-            </section>
-
-            <section id="resultsSection" class="card result-panel hidden">
-                <div class="route-header">
-                    <h2>Recommended Route</h2>
-                    <div class="cost-badge" id="tripCost">Cost: 0.0</div>
+            <div class="card hidden" id="resultCard">
+                <h3>✅ Optimal Route Found</h3>
+                <div class="stat-row">
+                    <div class="mini-stat"><span class="ms-icon">📏</span><span class="ms-val" id="rDist">—</span><span class="ms-lbl">km</span></div>
+                    <div class="mini-stat"><span class="ms-icon">⏱️</span><span class="ms-val" id="rTime">—</span><span class="ms-lbl">min</span></div>
+                    <div class="mini-stat"><span class="ms-icon">🚦</span><span class="ms-val" id="rTraffic">—</span><span class="ms-lbl">traffic</span></div>
+                    <div class="mini-stat"><span class="ms-icon">📊</span><span class="ms-val" id="rCost">—</span><span class="ms-lbl">cost</span></div>
                 </div>
-                
-                <div class="timeline" id="routeTimeline"></div>
-
-                <div class="explanation-box">
-                    <h3><span class="icon">✨</span> System Reasoning</h3>
-                    <p id="explanationText">Analyzing real-time multi-factor variables...</p>
-                </div>
-
-                <div class="feedback-panel">
-                    <p>Apply RL Gradient (Reward):</p>
-                    <div class="feedback-buttons">
-                        <button class="action-btn accept-btn" onclick="submitFeedback(1)">+1 Optimize</button>
-                        <button class="action-btn reject-btn" onclick="submitFeedback(-1)">-1 Penalize</button>
+                <div class="path-steps" id="pathSteps"></div>
+                <div class="explain-card"><p id="explainText">Analyzing...</p></div>
+                <div class="feedback-section">
+                    <p class="fb-title">Rate this route for RL training:</p>
+                    <div class="fb-row">
+                        <button class="fb-btn good" id="fbGood" onclick="sendFeedback(1)">👍 Good (+1)</button>
+                        <button class="fb-btn bad"  id="fbBad"  onclick="sendFeedback(-1)">👎 Bad (-1)</button>
                     </div>
-                    <div id="feedbackResult" class="feedback-msg hidden"></div>
+                    <p class="fb-msg hidden" id="fbMsg"></p>
                 </div>
-            </section>
-        </div>
-
-        <div class="right-panel">
-            <div class="map-control-bar">
-                <h3>Live Interactive Graph</h3>
-                <button id="openAnalytics" class="secondary-btn">📊 View RL Brain</button>
             </div>
-            
-            <div id="map" class="map-container card"></div>
-        </div>
-    </main>
+        </aside>
 
-    <!-- RL Analytics Modal -->
-    <div id="analyticsModal" class="modal hidden">
-        <div class="modal-content card">
-            <span id="closeAnalytics" class="close-btn">&times;</span>
-            <h2>Q-Table Analytics</h2>
-            <p class="subtitle">Live Reinforcement Learning State Matrix</p>
-            
-            <div class="table-container">
-                <table id="qTable">
-                    <thead>
-                        <tr>
-                            <th>State (Origin)</th>
-                            <th>Action (Next Node)</th>
-                            <th>Q-Value (Learned Bias)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="qTableBody">
-                    </tbody>
-                </table>
+        <main class="map-area">
+            <div id="map" class="map-container"></div>
+            <div class="map-footer">
+                <span class="footer-brain">🧠</span>
+                <div class="footer-text">
+                    <strong>SmartRoute SRMIST — Agentic AI Route Optimizer</strong>
+                    <span>Created by: devcrazy AKA Abhay Goyal</span>
+                    <span>MDP/RL · MCTS · Bayesian Inference · POMDP · Naive Bayes · Q-Learning</span>
+                    <span>Enter origin & destination, then click <b>Generate AI Route</b></span>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar sidebar-right">
+            <div class="card">
+                <h3>📈 RL Reward Progression</h3>
+                <div class="formula-box">
+                    <code>Q(s,a) = Q(s,a) + α·(r + γ·max Q(s',a') − Q(s,a))</code>
+                </div>
+                <div class="rl-info">
+                    <p>Dense: <code>0.25·dist + 0.25·time + 0.25·traffic + 0.25·RL</code></p>
+                    <p>Fastest: <code>0.15·dist + 0.55·time + 0.15·traffic + 0.15·RL</code></p>
+                    <p>Sparse: <code>completion + density + budget-fit + weather + variety</code></p>
+                </div>
+            </div>
+            <div class="card">
+                <h3>🌤️ Traffic Status</h3>
+                <div class="traffic-info" id="trafficInfo"><span class="traffic-icon">🟢</span><span>Normal Flow</span></div>
+                <p class="traffic-sub" id="trafficSub">Peak hours: 8-10 AM, 4-6 PM</p>
+            </div>
+            <div class="card">
+                <h3>👥 Campus Stats</h3>
+                <div class="campus-stats">
+                    <div class="cs-item"><span class="cs-val">20</span><span class="cs-lbl">Nodes</span></div>
+                    <div class="cs-item"><span class="cs-val">39</span><span class="cs-lbl">Edges</span></div>
+                    <div class="cs-item"><span class="cs-val" id="qEntries">0</span><span class="cs-lbl">Q-Entries</span></div>
+                </div>
+            </div>
+            <div class="card hidden" id="breakdownCard">
+                <h3>🔬 Segment Breakdown</h3>
+                <div class="breakdown-scroll">
+                    <table class="seg-table">
+                        <thead><tr><th>From</th><th>To</th><th>Dist</th><th>Time</th><th>Q</th><th>Cost</th></tr></thead>
+                        <tbody id="segBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         TAB 2: SRMIST CAMPUS VIEW
+         ═══════════════════════════════════════════════════ -->
+    <div class="view" id="srmistView">
+        <div class="srm-container">
+            <!-- Hero Banner -->
+            <div class="srm-hero">
+                <div class="srm-hero-text">
+                    <h2>🏛️ SRMIST KTR Campus Navigator</h2>
+                    <p>AI-powered navigation optimized for SRM Institute of Science and Technology, Kattankulathur</p>
+                </div>
+                <div class="srm-hero-stats">
+                    <div class="hero-stat"><span class="hs-val">20</span><span class="hs-lbl">Campus Locations</span></div>
+                    <div class="hero-stat"><span class="hs-val">39</span><span class="hs-lbl">Connected Paths</span></div>
+                    <div class="hero-stat"><span class="hs-val">4</span><span class="hs-lbl">AI Strategies</span></div>
+                    <div class="hero-stat"><span class="hs-val" id="srmFeedback">0</span><span class="hs-lbl">RL Training Points</span></div>
+                </div>
+            </div>
+
+            <!-- Quick Route Shortcuts -->
+            <div class="srm-section">
+                <h3>⚡ Quick Campus Routes</h3>
+                <p class="section-sub">One-click popular routes — AI auto-selects the best strategy</p>
+                <div class="quick-routes">
+                    <button class="qr-btn" onclick="quickRoute('Potheri_Station','SRM_Main_Gate')">
+                        <span class="qr-icon">🚉</span>
+                        <span class="qr-label">Station → Main Gate</span>
+                        <span class="qr-tag">Popular</span>
+                    </button>
+                    <button class="qr-btn" onclick="quickRoute('Mens_Hostel','UB')">
+                        <span class="qr-icon">🏠</span>
+                        <span class="qr-label">Hostel → University</span>
+                        <span class="qr-tag">Morning</span>
+                    </button>
+                    <button class="qr-btn" onclick="quickRoute('UB','Java_Green')">
+                        <span class="qr-icon">🍕</span>
+                        <span class="qr-label">Classes → Food Court</span>
+                        <span class="qr-tag">Lunch</span>
+                    </button>
+                    <button class="qr-btn" onclick="quickRoute('Library','Abode_Valley')">
+                        <span class="qr-icon">📚</span>
+                        <span class="qr-label">Library → Hostel</span>
+                        <span class="qr-tag">Evening</span>
+                    </button>
+                    <button class="qr-btn" onclick="quickRoute('Potheri_Station','Tech_Park')">
+                        <span class="qr-icon">💻</span>
+                        <span class="qr-label">Station → Tech Park</span>
+                        <span class="qr-tag">Work</span>
+                    </button>
+                    <button class="qr-btn" onclick="quickRoute('SRM_Main_Gate','Estancia')">
+                        <span class="qr-icon">🏢</span>
+                        <span class="qr-label">Gate → Estancia</span>
+                        <span class="qr-tag">IT Park</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Campus Zones -->
+            <div class="srm-row">
+                <div class="srm-section flex1">
+                    <h3>🗂️ Campus Zones</h3>
+                    <div class="zone-grid">
+                        <div class="zone-card academic">
+                            <span class="zone-icon">🎓</span>
+                            <strong>Academic Zone</strong>
+                            <span class="zone-nodes">University Building, Main Block, MBA Block, Biotech Dept, Mechanical Block</span>
+                        </div>
+                        <div class="zone-card hostel">
+                            <span class="zone-icon">🏠</span>
+                            <strong>Hostels</strong>
+                            <span class="zone-nodes">Nelson Mandela, NRI Hostel, Abode Valley, Women's Hostel</span>
+                        </div>
+                        <div class="zone-card landmark">
+                            <span class="zone-icon">🏛️</span>
+                            <strong>Landmarks</strong>
+                            <span class="zone-nodes">Main Gate, Library, Auditorium, Hospital, Clock Tower, Admin Block</span>
+                        </div>
+                        <div class="zone-card tech">
+                            <span class="zone-icon">💻</span>
+                            <strong>Tech & IT</strong>
+                            <span class="zone-nodes">Tech Park, Estancia IT Park, Architecture Block</span>
+                        </div>
+                        <div class="zone-card food">
+                            <span class="zone-icon">🍽️</span>
+                            <strong>Food & Social</strong>
+                            <span class="zone-nodes">Java Green Food Court</span>
+                        </div>
+                        <div class="zone-card transport">
+                            <span class="zone-icon">🚉</span>
+                            <strong>Transport</strong>
+                            <span class="zone-nodes">Potheri Railway Station</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="srm-section flex1">
+                    <h3>📅 Peak Hour Schedule</h3>
+                    <div class="schedule-list">
+                        <div class="sched-item rush">
+                            <span class="sched-time">08:00 — 10:00</span>
+                            <span class="sched-label">🔴 Morning Rush</span>
+                            <span class="sched-mult">2.5× traffic</span>
+                        </div>
+                        <div class="sched-item moderate">
+                            <span class="sched-time">12:00 — 13:00</span>
+                            <span class="sched-label">🟡 Lunch Hour</span>
+                            <span class="sched-mult">1.5× traffic</span>
+                        </div>
+                        <div class="sched-item rush">
+                            <span class="sched-time">16:00 — 18:00</span>
+                            <span class="sched-label">🟠 Evening Rush</span>
+                            <span class="sched-mult">2.0× traffic</span>
+                        </div>
+                        <div class="sched-item normal">
+                            <span class="sched-time">Other Hours</span>
+                            <span class="sched-label">🟢 Normal Flow</span>
+                            <span class="sched-mult">1.0× traffic</span>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top:1.2rem;">🤖 AI Strategies</h3>
+                    <div class="strategy-cards">
+                        <div class="strat-card"><span>🚀</span><strong>Fastest</strong><span class="strat-desc">Time=55%, Distance=15%</span></div>
+                        <div class="strat-card"><span>📏</span><strong>Shortest</strong><span class="strat-desc">Distance=60%, Time=15%</span></div>
+                        <div class="strat-card"><span>🚦</span><strong>Low Traffic</strong><span class="strat-desc">Traffic=60%, Time=15%</span></div>
+                        <div class="strat-card"><span>⚖️</span><strong>Balanced</strong><span class="strat-desc">All factors=25%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- About Section -->
+            <div class="srm-section">
+                <h3>🎯 About This System</h3>
+                <div class="about-grid">
+                    <div class="about-card">
+                        <span class="about-icon">🧠</span>
+                        <strong>Reinforcement Learning</strong>
+                        <p>Full Bellman Q-Learning equation with γ=0.9 discount factor. The AI learns from every user's feedback and adapts routes over time.</p>
+                    </div>
+                    <div class="about-card">
+                        <span class="about-icon">🗺️</span>
+                        <strong>A* Pathfinding</strong>
+                        <p>Real Haversine (great-circle) distance heuristic for geographically accurate, optimal campus navigation.</p>
+                    </div>
+                    <div class="about-card">
+                        <span class="about-icon">📊</span>
+                        <strong>4-Factor Cost</strong>
+                        <p>Every route considers distance, time, live traffic, and learned RL preferences simultaneously.</p>
+                    </div>
+                    <div class="about-card">
+                        <span class="about-icon">🕐</span>
+                        <strong>Dynamic Traffic</strong>
+                        <p>Real-time peak hour simulation with auto-adjusting traffic multipliers specific to SRMIST campus patterns.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- ═══════════════════════════════════════════════════
+         TAB 3: DASHBOARD VIEW
+         ═══════════════════════════════════════════════════ -->
+    <div class="view" id="dashboardView">
+        <div class="dash-container">
+            <h2 class="dash-title">📊 Route Intelligence Dashboard</h2>
+            <div class="dash-stats" id="dashStats">
+                <div class="dash-stat"><span class="ds-icon">🗺️</span><span class="ds-val" id="dsRoutes">0</span><span class="ds-lbl">Routes Computed</span></div>
+                <div class="dash-stat"><span class="ds-icon">🧠</span><span class="ds-val" id="dsQEntries">0</span><span class="ds-lbl">Q-Table Entries</span></div>
+                <div class="dash-stat"><span class="ds-icon">👍</span><span class="ds-val" id="dsPositive">0</span><span class="ds-lbl">Positive Biases</span></div>
+                <div class="dash-stat"><span class="ds-icon">👎</span><span class="ds-val" id="dsNegative">0</span><span class="ds-lbl">Negative Biases</span></div>
+                <div class="dash-stat"><span class="ds-icon">📍</span><span class="ds-val" id="dsStates">0</span><span class="ds-lbl">States Explored</span></div>
+            </div>
+            <div class="dash-row">
+                <div class="card dash-card">
+                    <h3>🧬 Q-Table Matrix</h3>
+                    <div class="qtable-scroll">
+                        <table class="seg-table">
+                            <thead><tr><th>State (Node)</th><th>Action (Next)</th><th>Q-Value</th></tr></thead>
+                            <tbody id="dashQBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card dash-card">
+                    <h3>📝 Recent Activity</h3>
+                    <div class="activity-feed" id="activityFeed">
+                        <p class="activity-empty">Compute routes and provide feedback to see activity here...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Q-Table Drawer ═══ -->
+    <div id="drawer" class="drawer">
+        <div class="drawer-head">
+            <h2>🧬 Neural Core — Q-Table</h2>
+            <button id="closeDrawer" class="close-x">&times;</button>
+        </div>
+        <div class="drawer-body">
+            <div class="rl-stats-grid" id="drawerStats"></div>
+            <p class="formula-hint">Q(s,a) = Q(s,a) + α·(reward + γ·max Q(s',a') − Q(s,a))</p>
+            <table class="seg-table">
+                <thead><tr><th>State</th><th>Action</th><th>Q-Value</th></tr></thead>
+                <tbody id="drawerQBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══ Floating AI Assistant Button ═══ -->
+    <div class="fab" id="fabBtn" title="AI Assistant">🧠</div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="script.js"></script>
 </body>
 </html>

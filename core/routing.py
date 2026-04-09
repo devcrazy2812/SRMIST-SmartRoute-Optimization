@@ -1,116 +1,167 @@
+"""
+SmartRoute SRMIST - Routing module
+Created by: devcrazy AKA Abhay Goyal
+"""
 import heapq
+import math
 from utils.logger import logger
 
+
 class Router:
-    def __init__(self, graph, rl_agent, rl_weight=5.0):
+    """
+    A* pathfinding engine with:
+    - Haversine heuristic (admissible, never overestimates)
+    - 4-factor edge cost: distance, time, traffic, RL preference
+    - Per-segment explainability
+    - Route statistics aggregation
+    """
+
+    def __init__(self, graph, rl_agent):
         self.graph = graph
         self.rl_agent = rl_agent
-        self.rl_weight = rl_weight  # How much Q-value influences the routing cost
 
-    def find_route(self, start_node, end_node, preference="balanced"):
-        """
-        Uses Dijkstra's algorithm with a custom cost function that includes
-        multi-factor weights and Q-value reinforcement learning biases.
-        """
-        if start_node not in self.graph.nodes or end_node not in self.graph.nodes:
-            logger.error("Start or End node not found in graph.")
-            return None, "Invalid nodes"
+    # ── Haversine heuristic ─────────────────────────────
+    @staticmethod
+    def _haversine_km(lat1, lon1, lat2, lon2):
+        R = 6371.0
+        la1, lo1, la2, lo2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat, dlon = la2 - la1, lo2 - lo1
+        a = math.sin(dlat / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin(dlon / 2) ** 2
+        return R * 2 * math.asin(math.sqrt(a))
 
-        logger.info(f"Calculating route from {self.graph.nodes[start_node]} to {self.graph.nodes[end_node]} ({preference} preference)")
+    def _h(self, nid, goal):
+        try:
+            a, b = self.graph.node_data[nid], self.graph.node_data[goal]
+            return self._haversine_km(a["lat"], a["lon"], b["lat"], b["lon"])
+        except KeyError:
+            return 0.0
 
-        # priority queue stores (cumulative_effective_cost, current_node, path, cost_breakdown)
-        pq = [(0.0, start_node, [start_node], [])]
+    # ── A* Search ───────────────────────────────────────
+    def find_route(self, start, end, preference="balanced"):
+        if start not in self.graph.nodes or end not in self.graph.nodes:
+            return None, "Invalid start or end node."
+
+        logger.info(
+            f"A* search: {self.graph.nodes[start]} -> {self.graph.nodes[end]} "
+            f"[{preference}]"
+        )
+
+        counter = 0
+        h0 = self._h(start, end)
+        # (f_cost, tiebreaker, g_cost, node, path, breakdown)
+        pq = [(h0, counter, 0.0, start, [start], [])]
         visited = set()
-        
+
         while pq:
-            current_cost, current, path, breakdown = heapq.heappop(pq)
-            
-            if current == end_node:
-                # Goal reached
-                # Calculate True base cost sum for output (without RL bias)
-                total_base_cost = sum(b['base_cost'] for b in breakdown)
-                explanation = self.generate_explanation(breakdown, preference)
-                logger.info(f"Route found! Total abstract cost: {total_base_cost:.2f}")
-                return {
-                    "path": path,
-                    "path_names": [self.graph.nodes[n] for n in path],
-                    "total_cost": total_base_cost,
-                    "breakdown": breakdown,
-                    "explanation": explanation
-                }, None
-                
-            if current in visited:
+            _f, _t, g, cur, path, steps = heapq.heappop(pq)
+
+            if cur == end:
+                return self._build_result(path, steps, preference), None
+
+            if cur in visited:
                 continue
-                
-            visited.add(current)
-            
-            for neighbor in self.graph.get_neighbors(current):
-                if neighbor in visited:
+            visited.add(cur)
+
+            for nb in self.graph.get_neighbors(cur):
+                if nb in visited:
                     continue
-                
-                # Multi-Factor Cost Evaluation
-                base_cost, edge_data = self.graph.calculate_cost(current, neighbor, preference)
-                
-                # Q-learning bias integration
-                q_value = self.rl_agent.get_q_value(current, neighbor)
-                
-                # Effective cost: reward (positive Q) reduces cost, penalty (negative Q) increases cost
-                effective_cost = base_cost - (self.rl_weight * q_value)
-                
-                # Ensure effective cost doesn't drop below 0 to avoid negative cycles in Dijkstra
-                effective_cost = max(0.1, effective_cost)
-                
-                new_cost = current_cost + effective_cost
-                new_path = list(path)
-                new_path.append(neighbor)
-                
-                step_breakdown = {
-                    "from": current,
-                    "to": neighbor,
-                    "distance": edge_data["distance"],
-                    "time": edge_data["time"],
-                    "traffic": edge_data["traffic"],
-                    "base_cost": base_cost,
-                    "q_value": q_value,
-                    "effective_cost": effective_cost,
-                    "is_rush_hour": edge_data.get("is_rush_hour", False)
+
+                # Get Q-value and pass it into the 4-factor cost function
+                q_val = self.rl_agent.get_q_value(cur, nb)
+                q_capped = max(-5.0, min(5.0, q_val))
+
+                base_cost, info = self.graph.calculate_cost(cur, nb, preference, q_capped)
+                if info is None:
+                    continue
+
+                eff = max(0.1, base_cost)
+                new_g = g + eff
+                counter += 1
+
+                step = {
+                    "from": cur,
+                    "from_name": self.graph.nodes.get(cur, cur),
+                    "to": nb,
+                    "to_name": self.graph.nodes.get(nb, nb),
+                    "distance": info["distance"],
+                    "time": info["time"],
+                    "traffic": info["traffic"],
+                    "base_cost": round(base_cost, 3),
+                    "q_value": round(q_val, 4),
+                    "effective_cost": round(eff, 3),
+                    "is_rush_hour": info.get("is_rush_hour", False),
+                    "traffic_mult": info.get("traffic_mult", 1.0),
                 }
-                new_breakdown = list(breakdown)
-                new_breakdown.append(step_breakdown)
-                
-                heapq.heappush(pq, (new_cost, neighbor, new_path, new_breakdown))
-                
-        logger.warning(f"No route found between {start_node} and {end_node}.")
-        return None, "No route found"
-        
-    def generate_explanation(self, breakdown, preference):
-        explanation = [f"This route was selected optimizing for the '{preference}' preference."]
-        
-        total_time = sum(b["time"] for b in breakdown)
-        total_dist = sum(b["distance"] for b in breakdown)
-        
-        explanation.append(f"Expected travel time is ~{total_time} mins for {total_dist} km.")
-        
-        # Check RL influence
-        rl_influenced = [b for b in breakdown if b["q_value"] != 0.0]
-        if rl_influenced:
-            pos_influence = sum(1 for b in rl_influenced if b["q_value"] > 0)
-            neg_influence = sum(1 for b in rl_influenced if b["q_value"] < 0)
-            if pos_influence > 0:
-                explanation.append("The system also learned from previous positive feedback and favored highly rated segments.")
-            if neg_influence > 0:
-                explanation.append("The system rerouted successfully to avoid paths with poor historical feedback.")
-        
-        # Check traffic peaks
-        high_traffic_edges = [b for b in breakdown if b["traffic"] > 0.6]
-        
-        # Check dynamic rush hour
-        rush_hour_edges = [b for b in breakdown if b.get("is_rush_hour", False)]
-        if rush_hour_edges:
-            explanation.append("⚠️ The engine detected current Time-of-Day rush hour traffic and mathematically spiked congestion weights.")
-        if not high_traffic_edges and preference == "low_traffic":
-            explanation.append("Successfully avoided high-traffic bottlenecks typical around SRMist campus.")
-        elif high_traffic_edges:
-            explanation.append("Note: Some segments have moderate/heavy traffic, but were chosen as they significantly reduce overall time/distance.")
-            
-        return " ".join(explanation)
+
+                heapq.heappush(
+                    pq,
+                    (new_g + self._h(nb, end), counter, new_g, nb, path + [nb], steps + [step]),
+                )
+
+        logger.warning(f"No route: {start} -> {end}")
+        return None, "No path exists between these locations."
+
+    # ── Build rich response ─────────────────────────────
+    def _build_result(self, path, steps, preference):
+        total_cost = sum(s["base_cost"] for s in steps)
+        total_dist = sum(s["distance"] for s in steps)
+        total_time = sum(s["time"] for s in steps)
+        avg_traffic = sum(s["traffic"] for s in steps) / max(len(steps), 1)
+
+        logger.info(f"Route found! Cost={total_cost:.2f}, Dist={total_dist:.1f}km, Time={total_time}min")
+
+        return {
+            "path": path,
+            "path_names": [self.graph.nodes[n] for n in path],
+            "total_cost": round(total_cost, 2),
+            "total_distance_km": round(total_dist, 2),
+            "total_time_min": total_time,
+            "avg_traffic": round(avg_traffic, 2),
+            "num_segments": len(steps),
+            "breakdown": steps,
+            "explanation": self._explain(steps, preference),
+        }
+
+    # ── Explainability ──────────────────────────────────
+    def _explain(self, steps, preference):
+        parts = []
+
+        # 1. Strategy
+        parts.append(f"Strategy: '{preference}'.")
+
+        # 2. Route stats
+        d = sum(s["distance"] for s in steps)
+        t = sum(s["time"] for s in steps)
+        parts.append(f"Total: {d:.1f} km, ~{t} min, {len(steps)} segments.")
+
+        # 3. Cost formula used
+        w = self.graph.preferences.get(preference, {})
+        parts.append(
+            f"Weights: distance={w.get('w_dist',0):.0%}, time={w.get('w_time',0):.0%}, "
+            f"traffic={w.get('w_traffic',0):.0%}, RL={w.get('w_rl',0):.0%}."
+        )
+
+        # 4. RL influence
+        rl_pos = sum(1 for s in steps if s["q_value"] > 0)
+        rl_neg = sum(1 for s in steps if s["q_value"] < 0)
+        if rl_pos:
+            parts.append(f"AI reinforced {rl_pos} segment(s) from positive feedback history.")
+        if rl_neg:
+            parts.append(f"AI penalized {rl_neg} segment(s) from negative feedback.")
+        if not rl_pos and not rl_neg:
+            parts.append("No RL bias yet -- provide feedback to train the model!")
+
+        # 5. Rush hour
+        rush = [s for s in steps if s.get("is_rush_hour")]
+        if rush:
+            mult = rush[0].get("traffic_mult", 2.0)
+            parts.append(f"Rush-hour detected: traffic multiplier {mult}x active on {len(rush)} segment(s).")
+
+        # 6. Traffic summary
+        heavy = [s for s in steps if s["traffic"] > 0.6]
+        if heavy and preference == "low_traffic":
+            parts.append(f"Warning: {len(heavy)} high-traffic segment(s) unavoidable on this path.")
+        elif not heavy and preference == "low_traffic":
+            parts.append("Successfully routed around all high-traffic areas.")
+
+        return " ".join(parts)
