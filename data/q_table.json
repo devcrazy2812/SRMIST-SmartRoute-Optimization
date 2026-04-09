@@ -1,0 +1,11 @@
+{
+    "Potheri_Station": {
+        "SRM_Main_Gate": 0.1
+    },
+    "SRM_Main_Gate": {
+        "Java_Green": 0.1
+    },
+    "Java_Green": {
+        "Tech_Park": 0.1
+    }
+}

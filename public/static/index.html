@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartRoute SRMIST — Agentic AI Travel Planner</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+    <meta name="description" content="SmartRoute SRMIST - Multi-Agent Autonomous Travel Intelligence with 7 AI agents, MDP/RL, Bayesian inference, MCTS, POMDP, interactive maps, booking wizard, packing lists, atlas & more">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<!-- === HEADER === -->
+<header class="header">
+    <div class="header-inner">
+        <div class="logo">
+            <div class="logo-icon">🧠</div>
+            <span>SmartRoute SRMIST</span>
+            <span class="badge">Agentic AI v4</span>
+        </div>
+        <nav class="header-nav">
+            <button class="nav-tab active" data-view="planner" onclick="switchView('planner')"><i class="fas fa-route"></i> Planner</button>
+            <button class="nav-tab" data-view="atlas" onclick="switchView('atlas')"><i class="fas fa-globe-americas"></i> Atlas</button>
+            <button class="nav-tab" data-view="packing" onclick="switchView('packing')"><i class="fas fa-suitcase-rolling"></i> Packing</button>
+            <button class="nav-tab" data-view="dashboard" onclick="switchView('dashboard')"><i class="fas fa-chart-bar"></i> Dashboard</button>
+        </nav>
+        <div class="header-actions">
+            <button class="btn btn-accent" onclick="emergencyReplan()"><i class="fas fa-bolt"></i> <span class="hide-mobile">Emergency</span> Replan</button>
+            <button class="btn btn-nearby" onclick="findNearbyPlaces()"><i class="fas fa-map-pin"></i> <span class="hide-mobile">Nearby</span></button>
+            <button class="btn-icon" onclick="toggleHistory()" title="Booking History"><i class="fas fa-history"></i></button>
+            <button class="btn-icon" onclick="exportPDF()" title="Export PDF"><i class="fas fa-file-pdf"></i></button>
+            <button class="btn-icon" onclick="shareTrip()" title="Share"><i class="fas fa-share-alt"></i></button>
+            <button class="btn-icon" onclick="toggleTheme()" title="Theme"><i class="fas fa-moon" id="themeIcon"></i></button>
+        </div>
+    </div>
+</header>
+
+<!-- ====== MAIN VIEW: PLANNER ====== -->
+<div id="view-planner" class="app-layout">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="left-sidebar">
+        <!-- Persona -->
+        <div class="panel">
+            <div class="panel-title"><span class="emoji">👤</span> Travel Persona</div>
+            <div class="persona-grid">
+                <div class="persona-card active" data-persona="solo" onclick="selectPersona('solo')"><span class="emoji">🎒</span>Solo</div>
+                <div class="persona-card" data-persona="family" onclick="selectPersona('family')"><span class="emoji">👨‍👩‍👧‍👦</span>Family</div>
+                <div class="persona-card" data-persona="luxury" onclick="selectPersona('luxury')"><span class="emoji">💎</span>Luxury</div>
+                <div class="persona-card" data-persona="adventure" onclick="selectPersona('adventure')"><span class="emoji">🏔️</span>Adventure</div>
+            </div>
+        </div>
+
+        <!-- Trip Input -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-plane-departure"></i> Plan Your Trip</div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-map-marker-alt" style="color:#ef4444"></i> Origin</label>
+                <div style="display:flex;gap:6px">
+                    <input type="text" id="origin" class="form-input" placeholder="e.g. Chennai, SRM University..." style="flex:1">
+                    <button class="btn-icon" onclick="detectUserLocation()" title="GPS"><i class="fas fa-crosshairs"></i></button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-plane-arrival" style="color:#667eea"></i> Destination</label>
+                <div style="display:flex;gap:6px">
+                    <input type="text" id="destination" class="form-input" placeholder="Jaipur, Agra, Goa..." style="flex:1">
+                    <button class="btn-icon" onclick="startVoice()" title="Voice"><i class="fas fa-microphone"></i></button>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Days</label><input type="number" id="duration" class="form-input" min="1" max="30" value="3"></div>
+                <div class="form-group"><label class="form-label">Budget (₹)</label><input type="number" id="budget" class="form-input" min="1000" value="15000" step="1000"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" id="startDate" class="form-input">
+            </div>
+            <div class="checkbox-row">
+                <label class="checkbox-label"><input type="checkbox" id="incFlights"> ✈️ Flights</label>
+                <label class="checkbox-label"><input type="checkbox" id="incTrains"> 🚂 Trains</label>
+                <label class="checkbox-label"><input type="checkbox" id="incHotels" checked> 🏨 Hotels</label>
+                <label class="checkbox-label"><input type="checkbox" id="incFood" checked> 🍽️ Food</label>
+            </div>
+            <button class="btn btn-primary" id="generateBtn" style="width:100%;justify-content:center;margin-top:6px" onclick="generateTrip()">
+                <i class="fas fa-robot"></i> Generate AI Trip
+            </button>
+            <div id="backendStatus" style="font-size:0.7rem;text-align:center;margin-top:4px;color:var(--text-3)">Checking backend...</div>
+            <button class="btn btn-recommend" onclick="openRecommendModal()" style="width:100%;justify-content:center;margin-top:6px">
+                <i class="fas fa-compass"></i> Help Me Choose
+            </button>
+            <button class="btn btn-halfday" onclick="openHalfDayModal()" style="width:100%;justify-content:center;margin-top:6px">
+                <i class="fas fa-clock"></i> Plan Half-Day
+            </button>
+            <button class="btn" onclick="openMultiCityModal()" style="width:100%;justify-content:center;margin-top:6px;background:linear-gradient(135deg,rgba(6,182,212,0.15),rgba(102,126,234,0.15));color:#06b6d4;border:1px solid rgba(6,182,212,0.2)">
+                <i class="fas fa-map-signs"></i> Multi-City Trip
+            </button>
+            <button class="btn" onclick="openCompareModal()" style="width:100%;justify-content:center;margin-top:6px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">
+                <i class="fas fa-balance-scale"></i> Compare Trips
+            </button>
+        </div>
+
+        <!-- Budget -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-wallet"></i> Budget Tracker</div>
+            <div class="budget-display">
+                <span class="budget-amount" id="budgetAmount">₹0</span>
+                <span class="budget-total" id="budgetTotal">/ ₹15,000</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="budgetFill" style="width:0%"></div></div>
+            <div class="budget-cats" id="budgetCats">
+                <div class="budget-cat"><span>🏨 Stay</span><span class="fw-600">₹0</span></div>
+                <div class="budget-cat"><span>🍽️ Food</span><span class="fw-600">₹0</span></div>
+                <div class="budget-cat"><span>🎯 Activities</span><span class="fw-600">₹0</span></div>
+                <div class="budget-cat"><span>🚗 Transport</span><span class="fw-600">₹0</span></div>
+                <div class="budget-cat"><span>🆘 Emergency</span><span class="fw-600">₹0</span></div>
+            </div>
+            <!-- Budget Pie Chart -->
+            <canvas id="budgetChart" width="200" height="200" style="margin:8px auto;display:block;max-width:180px"></canvas>
+        </div>
+
+        <!-- Bayesian -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-brain"></i> Bayesian Preferences</div>
+            <div id="bayesianBars"></div>
+        </div>
+
+        <!-- Dirichlet -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-chart-pie"></i> Dirichlet Proportions</div>
+            <div id="dirichletPanel" class="text-sm text-muted">Rate activities to update...</div>
+        </div>
+    </aside>
+
+    <!-- CENTER -->
+    <main class="center-content">
+        <!-- Map -->
+        <div class="map-container" id="mapSection">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button onclick="fitMapBounds()" title="Fit All"><i class="fas fa-expand"></i></button>
+                <button onclick="toggleMapLayer()" title="Map Style"><i class="fas fa-layer-group"></i></button>
+                <button onclick="toggleRouteLines()" title="Toggle Routes"><i class="fas fa-route"></i></button>
+            </div>
+        </div>
+
+        <!-- Agent Orchestration -->
+        <div class="panel agent-convo-panel" id="agentConvoPanel" style="display:none">
+            <div class="panel-title"><i class="fas fa-project-diagram"></i> Agent Orchestration — Live</div>
+            <div class="agent-convo" id="agentConvo"></div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="panel" id="insightsPanel" style="display:none">
+            <div class="panel-title"><i class="fas fa-lightbulb"></i> AI Insights & Safety Tips</div>
+            <div id="insightsContainer"></div>
+        </div>
+
+        <!-- Itinerary -->
+        <div class="itin-section">
+            <div id="itineraryContainer">
+                <div class="empty-state">
+                    <div class="emoji" style="font-size:4rem">🧠</div>
+                    <h3>SmartRoute SRMIST — Agentic AI Travel Planner</h3>
+                    <p>7 autonomous AI agents collaborate to plan your perfect trip using:<br>
+                    <strong>MDP/RL</strong> · <strong>MCTS</strong> · <strong>Bayesian Inference</strong> · <strong>POMDP</strong> · <strong>Naive Bayes</strong> · <strong>Q-Learning</strong></p>
+                    <p class="text-muted" style="font-size:0.82rem;margin-top:8px">Enter origin & destination, then click <strong>Generate AI Trip</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Smart AI Suggestions Banner -->
+        <div class="panel smart-suggestions-panel" id="smartSuggestionsPanel" style="display:none">
+            <div class="panel-title"><i class="fas fa-robot"></i> AI Smart Suggestions</div>
+            <div class="smart-suggestions-grid" id="smartSuggestionsGrid"></div>
+        </div>
+
+        <!-- Trip Countdown & Quick Stats -->
+        <div class="panel trip-countdown-panel" id="tripCountdownPanel" style="display:none">
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div class="countdown-box">
+                <div class="countdown-value" id="countdownDays">--</div>
+                <div class="countdown-label">days to go</div>
+              </div>
+              <div style="flex:1;min-width:200px">
+                <div class="trip-quick-stats" id="tripQuickStats"></div>
+              </div>
+              <div class="trip-actions-mini">
+                <button class="btn btn-sm btn-primary" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+                <button class="btn btn-sm" onclick="shareTrip()"><i class="fas fa-share-alt"></i> Share</button>
+                <button class="btn btn-sm" style="background:rgba(239,68,68,0.15);color:#ef4444" onclick="emergencyReplan()"><i class="fas fa-bolt"></i> Replan</button>
+              </div>
+            </div>
+        </div>
+
+        <!-- Booking Wizard -->
+        <div class="agentic-wizard" id="agenticWizard" style="display:none">
+            <div class="wizard-progress" id="wizardProgress">
+                <div class="wizard-step completed" data-step="trip_planned"><span class="step-icon">🗺️</span><span class="step-label">Plan</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="flights"><span class="step-icon">✈️</span><span class="step-label">Flights</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="trains"><span class="step-icon">🚂</span><span class="step-label">Trains</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="hotels"><span class="step-icon">🏨</span><span class="step-label">Hotels</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="cabs"><span class="step-icon">🚗</span><span class="step-label">Cabs</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="review"><span class="step-icon">🛒</span><span class="step-label">Review</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="payment"><span class="step-icon">💳</span><span class="step-label">Pay</span></div>
+                <div class="wizard-connector"></div>
+                <div class="wizard-step" data-step="confirmed"><span class="step-icon">✅</span><span class="step-label">Done</span></div>
+            </div>
+            <div class="agent-prompt-banner" id="agentPromptBanner">
+                <div class="agent-prompt-avatar">🤖</div>
+                <div class="agent-prompt-text" id="agentPromptText">Your itinerary is ready! Let me help you book everything.</div>
+                <div class="agent-prompt-actions" id="agentPromptActions">
+                    <button class="btn btn-primary btn-sm" onclick="searchFlights()"><i class="fas fa-plane"></i> Flights</button>
+                    <button class="btn btn-sm btn-train" onclick="searchTrains()"><i class="fas fa-train"></i> Trains</button>
+                    <button class="btn btn-sm btn-hotel" onclick="searchHotels()"><i class="fas fa-hotel"></i> Hotels</button>
+                    <button class="btn btn-sm btn-cab" onclick="searchCabs()"><i class="fas fa-car"></i> Cabs</button>
+                    <button class="btn btn-sm btn-skip" onclick="skipToReview()"><i class="fas fa-forward"></i> Skip</button>
+                </div>
+            </div>
+            <div id="bookingResultsPanel" style="display:none">
+                <div class="panel-title" id="bookingResultsTitle"></div>
+                <div id="bookingResultsList" class="booking-results-grid"></div>
+            </div>
+            <div id="reviewCartPanel" style="display:none">
+                <div class="panel-title"><i class="fas fa-shopping-cart"></i> 🛒 Review Bookings</div>
+                <div id="cartSummary" class="cart-summary"></div>
+                <div class="cart-total" id="cartTotal"></div>
+                <div style="display:flex;gap:8px;margin-top:12px">
+                    <button class="btn btn-primary" onclick="proceedToPayment()" style="flex:1"><i class="fas fa-credit-card"></i> Pay</button>
+                    <button class="btn btn-edit" onclick="editSelections()"><i class="fas fa-edit"></i> Edit</button>
+                </div>
+            </div>
+            <div id="paymentPanel" style="display:none">
+                <div class="panel-title"><i class="fas fa-credit-card"></i> 💳 Payment</div>
+                <div class="payment-methods" id="paymentMethods">
+                    <div class="payment-method active" onclick="selectPayment('card',this)"><i class="fas fa-credit-card"></i><span>Card</span></div>
+                    <div class="payment-method" onclick="selectPayment('upi',this)"><i class="fas fa-mobile-alt"></i><span>UPI</span></div>
+                    <div class="payment-method" onclick="selectPayment('wallet',this)"><i class="fas fa-wallet"></i><span>Wallet</span></div>
+                    <div class="payment-method" onclick="selectPayment('netbanking',this)"><i class="fas fa-university"></i><span>NetBanking</span></div>
+                </div>
+                <div id="paymentFormFields">
+                    <div class="form-group"><label class="form-label">Card Number</label><input type="text" class="form-input" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Expiry</label><input type="text" class="form-input" id="cardExpiry" placeholder="MM/YY" maxlength="5"></div>
+                        <div class="form-group"><label class="form-label">CVV</label><input type="password" class="form-input" id="cardCVV" placeholder="***" maxlength="4"></div>
+                    </div>
+                </div>
+                <div id="paymentTotal" class="cart-total"></div>
+                <button class="btn btn-accent" style="width:100%;justify-content:center;margin-top:12px" onclick="processPayment()"><i class="fas fa-lock"></i> Pay Securely</button>
+            </div>
+            <div id="confirmationPanel" style="display:none">
+                <div class="confirmation-hero">
+                    <div style="font-size:4rem">✅</div>
+                    <h2>Trip Fully Booked!</h2>
+                    <p id="confirmationMsg">All bookings confirmed. Have an amazing trip!</p>
+                </div>
+                <div id="confirmationDetails" class="confirmation-details"></div>
+            </div>
+        </div>
+
+        <!-- Social Discovery -->
+        <div class="itin-section" id="socialDiscoverySection">
+            <div class="section-title"><i class="fas fa-compass"></i> Viral & Hidden Gems</div>
+            <div class="discovery-tabs">
+                <button class="disc-tab active" onclick="switchDiscTab('instagram',this)"><i class="fab fa-instagram"></i> Trending</button>
+                <button class="disc-tab" onclick="switchDiscTab('youtube',this)"><i class="fab fa-youtube"></i> Hidden Gems</button>
+                <button class="disc-tab" onclick="switchDiscTab('foodie',this)"><i class="fas fa-utensils"></i> Foodie Spots</button>
+            </div>
+            <div id="disc-instagram" class="disc-content active"><div class="empty-state"><div class="emoji">📸</div><p>Generate a trip to see trending spots.</p></div><div class="discovery-grid" id="instaGrid"></div></div>
+            <div id="disc-youtube" class="disc-content" style="display:none"><div class="empty-state"><div class="emoji">🎬</div><p>YouTube hidden gems appear after trip generation.</p></div><div class="discovery-grid" id="ytGrid"></div></div>
+            <div id="disc-foodie" class="disc-content" style="display:none"><div class="empty-state"><div class="emoji">🍕</div><p>Best local food spots appear here.</p></div><div class="discovery-grid" id="foodGrid"></div></div>
+        </div>
+
+        <!-- Nearby Places -->
+        <div class="panel" id="nearbyPanel" style="display:none">
+            <div class="panel-title"><i class="fas fa-map-pin"></i> 📍 Nearby Places</div>
+            <div id="nearbyContainer"></div>
+        </div>
+
+        <!-- Language Tips -->
+        <div class="lang-section" id="languageTips">
+            <div class="section-title">🗣️ Language Tips</div>
+            <div class="empty-state"><div class="emoji">🌍</div><p>Travel phrases appear after trip generation.</p></div>
+        </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="right-sidebar">
+        <!-- AI Agents -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-robot"></i> AI Agents (7)</div>
+            <div id="agentCards"></div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-stream"></i> Agent Activity</div>
+            <div class="activity-log" id="activityLog"></div>
+        </div>
+
+        <!-- RL Chart -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-chart-line"></i> RL Reward Progression</div>
+            <div class="chart-container"><canvas id="rlChart"></canvas></div>
+            <div class="text-xs text-muted mt-1">Dense: 0.25·rating + 0.20·budget + 0.15·weather − 0.10·crowd + 0.15·time + 0.15·diversity<br>Sparse: completion + density + budget-fit + weather + variety</div>
+        </div>
+
+        <!-- Weather -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-cloud-sun"></i> Weather Forecast</div>
+            <div class="weather-grid" id="weatherCards">
+                <div class="weather-card"><div class="weather-icon">☀️</div><div class="weather-temp">—</div><div class="weather-desc">No data</div></div>
+            </div>
+        </div>
+
+        <!-- Crowd -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-users"></i> Crowd Level</div>
+            <div class="flex-between mb-1"><span class="text-xs text-muted">Current:</span><span class="text-xs fw-600" id="crowdLabel">—</span></div>
+            <div class="crowd-bar" id="crowdBar">
+                <div class="crowd-segment"></div><div class="crowd-segment"></div><div class="crowd-segment"></div><div class="crowd-segment"></div><div class="crowd-segment"></div>
+            </div>
+        </div>
+
+        <!-- Currency Converter (from NOMAD) -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-exchange-alt"></i> Currency Converter</div>
+            <div class="form-row">
+                <input type="number" id="currAmount" class="form-input" value="1000" style="flex:1">
+                <select id="currFrom" class="form-input" style="width:70px"><option value="INR">₹ INR</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option></select>
+            </div>
+            <div class="text-center mt-1"><i class="fas fa-arrow-down" style="color:var(--accent)"></i></div>
+            <div class="form-row mt-1">
+                <div id="currResult" class="form-input" style="flex:1;display:flex;align-items:center;font-weight:600">—</div>
+                <select id="currTo" class="form-input" style="width:70px" onchange="convertCurrency()"><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="INR">₹ INR</option><option value="JPY">¥ JPY</option><option value="THB">฿ THB</option></select>
+            </div>
+            <button class="btn btn-sm" onclick="convertCurrency()" style="width:100%;margin-top:6px;justify-content:center"><i class="fas fa-sync"></i> Convert</button>
+        </div>
+
+        <!-- Timezone (from NOMAD) -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-clock"></i> World Clock</div>
+            <div id="worldClocks" class="timezone-grid">
+                <div class="tz-card"><div class="tz-city">Your Time</div><div class="tz-time" id="tzLocal">--:--</div></div>
+                <div class="tz-card"><div class="tz-city" id="tzDestName">Destination</div><div class="tz-time" id="tzDest">--:--</div></div>
+            </div>
+        </div>
+
+        <!-- Emergency Contacts -->
+        <div class="panel" id="emergencyPanel">
+            <div class="panel-title"><i class="fas fa-phone-alt" style="color:#ef4444"></i> Emergency Contacts</div>
+            <div id="emergencyContacts">
+                <div class="emg-row"><span>🚨 Universal</span><a href="tel:112" class="emg-num">112</a></div>
+                <div class="emg-row"><span>🚔 Police</span><a href="tel:100" class="emg-num">100</a></div>
+                <div class="emg-row"><span>🚑 Ambulance</span><a href="tel:108" class="emg-num">108</a></div>
+                <div class="emg-row"><span>🚒 Fire</span><a href="tel:101" class="emg-num">101</a></div>
+                <div class="emg-row"><span>👩 Women</span><a href="tel:1091" class="emg-num">1091</a></div>
+                <div class="emg-row"><span>🏛️ Tourist</span><a href="tel:1363" class="emg-num">1363</a></div>
+            </div>
+        </div>
+
+        <!-- Explainability -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-lightbulb"></i> AI Reasoning</div>
+            <div id="explainPanel" class="text-sm text-muted">Agents explain decisions here...</div>
+        </div>
+
+        <!-- POMDP -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-brain"></i> Belief State (POMDP)</div>
+            <div id="pomdpPanel" class="text-sm text-muted">Belief updates appear after rating...</div>
+        </div>
+
+        <!-- Smart Automations Panel -->
+        <div class="panel" id="automationsPanel">
+            <div class="panel-title"><i class="fas fa-magic"></i> Smart Automations</div>
+            <div class="auto-actions">
+              <button class="btn btn-sm auto-btn" onclick="autoOptimizeRoute()" title="AI re-orders your itinerary to minimize travel time">
+                <i class="fas fa-route"></i> Optimize Route
+              </button>
+              <button class="btn btn-sm auto-btn" onclick="autoBalanceBudget()" title="Redistribute budget across days for best value">
+                <i class="fas fa-balance-scale"></i> Balance Budget
+              </button>
+              <button class="btn btn-sm auto-btn" onclick="autoWeatherSwap()" title="Swap outdoor activities on rainy days with indoor alternatives">
+                <i class="fas fa-cloud-sun-rain"></i> Weather Swap
+              </button>
+              <button class="btn btn-sm auto-btn" onclick="autoAvoidCrowds()" title="Reorder activities to visit popular spots at low-crowd times">
+                <i class="fas fa-user-clock"></i> Avoid Crowds
+              </button>
+              <button class="btn btn-sm auto-btn" onclick="autoSuggestFood()" title="Insert top-rated food stops between activities">
+                <i class="fas fa-utensils"></i> Add Food Stops
+              </button>
+              <button class="btn btn-sm auto-btn" onclick="autoGenerateChecklist()" title="Generate a pre-trip checklist with deadlines">
+                <i class="fas fa-tasks"></i> Pre-Trip Checklist
+              </button>
+            </div>
+            <div id="autoResult" class="auto-result" style="display:none"></div>
+        </div>
+
+        <!-- Travel Readiness Score -->
+        <div class="panel" id="readinessPanel">
+            <div class="panel-title"><i class="fas fa-clipboard-check"></i> Travel Readiness</div>
+            <div class="readiness-score" id="readinessScore">
+              <div class="readiness-ring" id="readinessRing">
+                <svg viewBox="0 0 36 36" class="readiness-svg">
+                  <path class="readiness-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                  <path class="readiness-fill" id="readinessFill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                  <text x="18" y="20.35" class="readiness-text" id="readinessPercent">0%</text>
+                </svg>
+              </div>
+              <div class="readiness-items" id="readinessItems">
+                <div class="readiness-item" data-ready="false"><i class="far fa-circle"></i> Generate itinerary</div>
+                <div class="readiness-item" data-ready="false"><i class="far fa-circle"></i> Book transport</div>
+                <div class="readiness-item" data-ready="false"><i class="far fa-circle"></i> Book accommodation</div>
+                <div class="readiness-item" data-ready="false"><i class="far fa-circle"></i> Pack essentials</div>
+                <div class="readiness-item" data-ready="false"><i class="far fa-circle"></i> Check weather</div>
+              </div>
+            </div>
+        </div>
+
+        <!-- Trip Journal -->
+        <div class="panel">
+            <div class="panel-title"><i class="fas fa-book"></i> Trip Journal</div>
+            <textarea id="journalEntry" class="form-input" rows="3" placeholder="Write your trip thoughts, memories, observations..." style="resize:vertical;font-size:0.82rem"></textarea>
+            <button class="btn btn-sm" onclick="saveJournalEntry()" style="width:100%;margin-top:6px;justify-content:center"><i class="fas fa-save"></i> Save Entry</button>
+            <div id="journalEntries" class="journal-entries" style="margin-top:8px;max-height:200px;overflow-y:auto"></div>
+        </div>
+    </aside>
+</div>
+
+<!-- ====== ATLAS VIEW (from NOMAD) ====== -->
+<div id="view-atlas" class="atlas-view" style="display:none">
+    <div class="atlas-container">
+        <div class="atlas-header">
+            <h2><i class="fas fa-globe-americas"></i> Travel Atlas — Countries Explored</h2>
+            <div class="atlas-stats" id="atlasStats">
+                <div class="atlas-stat"><span class="stat-value" id="countriesVisited">0</span><span class="stat-label">Countries</span></div>
+                <div class="atlas-stat"><span class="stat-value" id="continentsVisited">0</span><span class="stat-label">Continents</span></div>
+                <div class="atlas-stat"><span class="stat-value" id="tripsCount">0</span><span class="stat-label">Trips</span></div>
+                <div class="atlas-stat"><span class="stat-value" id="totalDistance">0</span><span class="stat-label">km Traveled</span></div>
+            </div>
+        </div>
+        <div id="atlasMap" style="height:500px;border-radius:var(--radius);overflow:hidden;background:#f2f3f5"></div>
+        <div class="atlas-legend" id="atlasLegend"></div>
+    </div>
+</div>
+
+<!-- ====== DASHBOARD VIEW ====== -->
+<div id="view-dashboard" class="atlas-view" style="display:none">
+    <div class="atlas-container">
+        <div class="atlas-header">
+            <h2><i class="fas fa-chart-bar"></i> Travel Dashboard</h2>
+        </div>
+        <div class="dashboard-grid" id="dashboardGrid">
+            <div class="dash-card">
+                <div class="dash-icon" style="color:#667eea"><i class="fas fa-route"></i></div>
+                <div class="dash-value" id="dashTrips">0</div>
+                <div class="dash-label">Trips Planned</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon" style="color:#10b981"><i class="fas fa-rupee-sign"></i></div>
+                <div class="dash-value" id="dashBudget">₹0</div>
+                <div class="dash-label">Total Budget</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon" style="color:#f59e0b"><i class="fas fa-map-marker-alt"></i></div>
+                <div class="dash-value" id="dashPlaces">0</div>
+                <div class="dash-label">Places Explored</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon" style="color:#8b5cf6"><i class="fas fa-brain"></i></div>
+                <div class="dash-value" id="dashAIActions">0</div>
+                <div class="dash-label">AI Decisions</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon" style="color:#ec4899"><i class="fas fa-star"></i></div>
+                <div class="dash-value" id="dashRatings">0</div>
+                <div class="dash-label">Ratings Given</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-icon" style="color:#ef4444"><i class="fas fa-heartbeat"></i></div>
+                <div class="dash-value" id="dashAvgReward">0</div>
+                <div class="dash-label">Avg RL Reward</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+            <div class="panel">
+                <div class="panel-title"><i class="fas fa-chart-line"></i> Reward Progression</div>
+                <div class="chart-container" style="height:200px"><canvas id="dashRLChart"></canvas></div>
+            </div>
+            <div class="panel">
+                <div class="panel-title"><i class="fas fa-chart-pie"></i> Preference Distribution</div>
+                <div class="chart-container" style="height:200px"><canvas id="dashPrefChart"></canvas></div>
+            </div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+            <div class="panel-title"><i class="fas fa-history"></i> Recent Activity</div>
+            <div id="dashRecentActivity" class="text-sm text-muted">Generate trips to see activity here...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== PACKING VIEW (from NOMAD) ====== -->
+<div id="view-packing" class="packing-view" style="display:none">
+    <div class="packing-container">
+        <div class="packing-header">
+            <h2><i class="fas fa-suitcase-rolling"></i> Smart Packing List</h2>
+            <div class="packing-progress">
+                <div class="progress-bar" style="width:200px"><div class="progress-fill" id="packingProgress" style="width:0%"></div></div>
+                <span class="text-sm" id="packingCount">0/0 packed</span>
+            </div>
+        </div>
+        <div id="packingList" class="packing-grid">
+            <div class="empty-state"><div class="emoji">🧳</div><p>Generate a trip first to get a smart AI-curated packing list.</p></div>
+        </div>
+    </div>
+</div>
+
+<!-- === BOTTOM PANELS === -->
+<div class="bottom-panels" id="bottomPanels">
+    <div class="bottom-panel">
+        <div class="panel-title"><i class="fas fa-project-diagram"></i> Agent Communication Graph</div>
+        <canvas id="agentGraphCanvas"></canvas>
+    </div>
+    <div class="bottom-panel">
+        <div class="panel-title"><i class="fas fa-sitemap"></i> MDP State Transitions & POMDP Flow</div>
+        <div class="text-xs fw-700 mb-1" style="color:var(--accent)">MDP State Space</div>
+        <div class="mdp-flow">
+            <div class="mdp-node" style="background:rgba(102,126,234,0.15);border-color:var(--primary)">📍 Location</div>
+            <div class="mdp-arrow">→</div>
+            <div class="mdp-node" style="background:rgba(16,185,129,0.15);border-color:var(--success)">💰 Budget</div>
+            <div class="mdp-arrow">→</div>
+            <div class="mdp-node" style="background:rgba(245,158,11,0.15);border-color:var(--warning)">🌦️ Weather</div>
+            <div class="mdp-arrow">→</div>
+            <div class="mdp-node" style="background:rgba(239,68,68,0.15);border-color:var(--danger)">👥 Crowd</div>
+            <div class="mdp-arrow">→</div>
+            <div class="mdp-node" style="background:rgba(236,72,153,0.15);border-color:#ec4899">😊 Satisfaction</div>
+        </div>
+        <div class="divider"></div>
+        <div class="text-xs fw-700 mb-1" style="color:var(--accent)">POMDP Pipeline</div>
+        <div class="pomdp-flow">
+            <div class="pomdp-step" style="background:rgba(102,126,234,0.2)">👁️ Observe</div>
+            <div class="mdp-arrow">→</div>
+            <div class="pomdp-step" style="background:rgba(118,75,162,0.2)">🧮 Infer</div>
+            <div class="mdp-arrow">→</div>
+            <div class="pomdp-step" style="background:rgba(79,172,254,0.2)">📊 MDP</div>
+            <div class="mdp-arrow">→</div>
+            <div class="pomdp-step" style="background:rgba(16,185,129,0.2)">📋 Policy</div>
+            <div class="mdp-arrow">→</div>
+            <div class="pomdp-step" style="background:rgba(236,72,153,0.2)">⚡ Action</div>
+        </div>
+        <div class="divider"></div>
+        <div class="text-xs fw-700 mb-1" style="color:var(--accent)">Action Space</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <span class="tag tag-info">Keep Plan</span>
+            <span class="tag tag-warning">Swap Activity</span>
+            <span class="tag tag-danger">Change Day</span>
+            <span class="tag tag-success">Reorder</span>
+            <span class="tag" style="background:rgba(118,75,162,0.15);color:#764ba2">Adjust Budget</span>
+            <span class="tag" style="background:rgba(236,72,153,0.15);color:#ec4899">Add Contingency</span>
+        </div>
+    </div>
+</div>
+
+<!-- === MODALS === -->
+<!-- Media Modal -->
+<div class="modal-overlay" id="mediaModal">
+    <div class="media-modal">
+        <div class="media-modal-header"><h2 id="modalTitle">Place Details</h2><button class="btn-icon" onclick="closeMediaModal()"><i class="fas fa-times"></i></button></div>
+        <div class="media-modal-body">
+            <div class="media-section"><h3><i class="fas fa-images"></i> Photos</h3><div class="photo-gallery" id="modalPhotos"></div></div>
+            <div class="media-section"><h3><i class="fas fa-map-marked-alt"></i> Map</h3><div id="modalMapEmbed" style="width:100%;height:250px;border-radius:var(--radius);overflow:hidden;background:var(--bg-4)"></div></div>
+            <div class="media-section"><h3><i class="fas fa-info-circle"></i> Info</h3><div id="modalInfo" class="modal-quick-info"></div></div>
+            <div class="media-section"><h3><i class="fas fa-link"></i> Links</h3><div class="media-links" id="modalLinks"></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Emergency Replan Modal -->
+<div class="modal-overlay" id="replanModal">
+    <div class="modal-content" style="max-width:500px">
+        <div class="modal-header"><h3>⚡ Emergency Replan</h3><button class="btn-icon" onclick="closeModal('replanModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Reason</label>
+                <select id="replanReason" class="form-input" onchange="updateReplanFields()">
+                    <option value="delay">⏰ Travel Delay</option><option value="weather">🌧️ Weather Risk</option><option value="crowd">👥 Sudden Crowd</option>
+                </select>
+            </div>
+            <div id="delayFields"><div class="form-group"><label class="form-label">Hours Delayed</label><input type="number" id="delayHours" class="form-input" min="1" max="12" value="4"></div></div>
+            <div id="weatherFields" style="display:none"><div class="form-group"><label class="form-label">Weather</label><select id="weatherRisk" class="form-input"><option value="rain">🌧️ Rain</option><option value="heavy_rain">🌧️ Heavy Rain</option><option value="storm">⛈️ Storm</option><option value="extreme_heat">🔥 Extreme Heat</option></select></div></div>
+            <div id="crowdFields" style="display:none"><div class="form-group"><label class="form-label">Crowd Level</label><select id="crowdLevel" class="form-input"><option value="high">👥 High</option><option value="very_high">🚫 Very High</option></select></div></div>
+            <div class="form-group"><label class="form-label">Affected Day</label><input type="number" id="replanDay" class="form-input" min="1" max="14" value="1"></div>
+            <button class="btn btn-accent" style="width:100%;justify-content:center" onclick="doReplan()"><i class="fas fa-sync-alt"></i> Replan Now</button>
+        </div>
+    </div>
+</div>
+
+<!-- Recommend Modal -->
+<div class="modal-overlay" id="recommendModal">
+    <div class="modal-content" style="max-width:650px">
+        <div class="modal-header"><h3><i class="fas fa-compass" style="color:#ec4899"></i> Help Me Choose</h3><button class="btn-icon" onclick="closeModal('recommendModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Current City</label><input type="text" id="recLocation" class="form-input" placeholder="e.g. Chennai, Mumbai..."></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Budget (₹)</label><input type="number" id="recBudget" class="form-input" value="20000" step="5000"></div>
+                <div class="form-group"><label class="form-label">Days</label><input type="number" id="recDuration" class="form-input" value="3" min="1" max="30"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Interests</label>
+                <div class="pref-chips">
+                    <label class="pref-chip"><input type="checkbox" value="nature" class="rec-pref"> 🌿 Nature</label>
+                    <label class="pref-chip"><input type="checkbox" value="culture" class="rec-pref"> 🏛️ Culture</label>
+                    <label class="pref-chip"><input type="checkbox" value="adventure" class="rec-pref"> 🏔️ Adventure</label>
+                    <label class="pref-chip"><input type="checkbox" value="beach" class="rec-pref"> 🏖️ Beach</label>
+                    <label class="pref-chip"><input type="checkbox" value="food" class="rec-pref"> 🍽️ Food</label>
+                    <label class="pref-chip"><input type="checkbox" value="nightlife" class="rec-pref"> 🌃 Nightlife</label>
+                    <label class="pref-chip"><input type="checkbox" value="spiritual" class="rec-pref"> 🛕 Spiritual</label>
+                    <label class="pref-chip"><input type="checkbox" value="history" class="rec-pref"> 📜 History</label>
+                    <label class="pref-chip"><input type="checkbox" value="shopping" class="rec-pref"> 🛍️ Shopping</label>
+                </div>
+            </div>
+            <button class="btn btn-accent" style="width:100%;justify-content:center;background:linear-gradient(135deg,#ec4899,#8b5cf6)" onclick="getRecommendations()"><i class="fas fa-magic"></i> Find Destinations</button>
+            <div id="recommendResults" style="margin-top:12px"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Multi-City Modal -->
+<div class="modal-overlay" id="multiCityModal">
+    <div class="modal-content" style="max-width:650px">
+        <div class="modal-header"><h3><i class="fas fa-map-signs" style="color:#06b6d4"></i> Multi-City Trip Planner</h3><button class="btn-icon" onclick="closeModal('multiCityModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Starting City</label><input type="text" id="mcOrigin" class="form-input" placeholder="e.g. Chennai"></div>
+            <div id="mcCitiesList">
+                <div class="mc-city-row" data-idx="0">
+                    <input type="text" class="form-input mc-city" placeholder="City 1 (e.g. Jaipur)" style="flex:2">
+                    <input type="number" class="form-input mc-days" value="2" min="1" max="14" style="width:70px" placeholder="Days">
+                    <button class="btn-icon" onclick="removeMCCity(this)" title="Remove"><i class="fas fa-times" style="color:var(--danger)"></i></button>
+                </div>
+                <div class="mc-city-row" data-idx="1">
+                    <input type="text" class="form-input mc-city" placeholder="City 2 (e.g. Udaipur)" style="flex:2">
+                    <input type="number" class="form-input mc-days" value="2" min="1" max="14" style="width:70px" placeholder="Days">
+                    <button class="btn-icon" onclick="removeMCCity(this)" title="Remove"><i class="fas fa-times" style="color:var(--danger)"></i></button>
+                </div>
+            </div>
+            <button class="btn btn-sm" onclick="addMCCity()" style="margin-top:8px"><i class="fas fa-plus"></i> Add City</button>
+            <div class="form-row" style="margin-top:12px">
+                <div class="form-group"><label class="form-label">Total Budget (₹)</label><input type="number" id="mcBudget" class="form-input" value="30000" step="5000"></div>
+            </div>
+            <button class="btn btn-accent" style="width:100%;justify-content:center;margin-top:12px;background:linear-gradient(135deg,#06b6d4,#667eea)" onclick="generateMultiCityTrip()"><i class="fas fa-magic"></i> Plan Multi-City Trip</button>
+            <div id="multiCityResults" style="margin-top:12px"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Compare Trips Modal -->
+<div class="modal-overlay" id="compareModal">
+    <div class="modal-content" style="max-width:700px">
+        <div class="modal-header"><h3><i class="fas fa-balance-scale" style="color:#f59e0b"></i> Compare Trips</h3><button class="btn-icon" onclick="closeModal('compareModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div id="compareContent">
+                <p class="text-sm text-muted">Generate trips to compare. Each trip you generate is saved for comparison.</p>
+                <div id="compareGrid" style="margin-top:12px"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Half-Day Modal -->
+<div class="modal-overlay" id="halfDayModal">
+    <div class="modal-content" style="max-width:550px">
+        <div class="modal-header"><h3><i class="fas fa-clock" style="color:#06b6d4"></i> Plan Remaining Time</h3><button class="btn-icon" onclick="closeModal('halfDayModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Location</label><input type="text" id="hdLocation" class="form-input" placeholder="e.g. Marina Beach, SRM Campus..."></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Hours</label><input type="number" id="hdHours" class="form-input" min="1" max="12" value="5"></div>
+                <div class="form-group"><label class="form-label">Time</label><select id="hdTimeOfDay" class="form-input"><option value="morning">🌅 Morning</option><option value="afternoon" selected>☀️ Afternoon</option><option value="evening">🌆 Evening</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">Budget (₹)</label><input type="number" id="hdBudget" class="form-input" value="3000" step="500"></div>
+            <button class="btn btn-accent" style="width:100%;justify-content:center;background:linear-gradient(135deg,#06b6d4,#10b981)" onclick="planHalfDay()"><i class="fas fa-magic"></i> Plan My Time</button>
+            <div id="halfDayResults" style="margin-top:12px"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner"></div>
+        <div class="loading-text">🧠 AI Agents are collaborating...</div>
+        <div class="loading-agents" id="loadingAgents"></div>
+        <div class="loading-sub">MCTS · Q-Learning · Bayesian · POMDP · Naive Bayes</div>
+    </div>
+</div>
+
+<!-- Chatbot -->
+<div class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()">
+    <i class="fas fa-robot"></i>
+</div>
+<div class="chatbot-window" id="chatbotWindow">
+    <div class="chatbot-header">
+        <div class="chatbot-header-info">
+            <div class="chatbot-avatar">🧠</div>
+            <div><div class="chatbot-name">SmartRoute AI</div><div class="chatbot-status">Online</div></div>
+        </div>
+        <button class="btn-icon" onclick="toggleChatbot()" style="width:30px;height:30px"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="chatbot-messages" id="chatMessages">
+    </div>
+    <div class="chatbot-suggestions" id="chatSuggestions">
+        <button onclick="sendSuggestion('Suggest places nearby')">📍 Nearby</button>
+        <button onclick="sendSuggestion('Hidden gems to visit?')">💎 Gems</button>
+        <button onclick="sendSuggestion('Best local food?')">🍽️ Food</button>
+        <button onclick="sendSuggestion('Weather forecast?')">🌦️ Weather</button>
+        <button onclick="sendSuggestion('Budget saving tips')">💰 Budget</button>
+        <button onclick="sendSuggestion('Safety tips')">🛡️ Safety</button>
+    </div>
+    <div class="chatbot-input">
+        <input type="text" id="chatInput" placeholder="Ask about your trip..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button onclick="sendChat()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+</div>
+
+<!-- Booking History Sidebar -->
+<div class="history-overlay" id="historyOverlay" onclick="toggleHistory()"></div>
+<aside class="history-sidebar" id="historySidebar">
+    <div class="history-header"><h3><i class="fas fa-history"></i> Booking History</h3><button class="btn-icon" onclick="toggleHistory()"><i class="fas fa-times"></i></button></div>
+    <div class="history-stats" id="historyStats">
+        <div class="history-stat"><span class="stat-value" id="histTotal">0</span><span class="stat-label">Bookings</span></div>
+        <div class="history-stat"><span class="stat-value" id="histSpent">₹0</span><span class="stat-label">Spent</span></div>
+    </div>
+    <div class="history-list" id="historyList"><div class="empty-state"><div class="emoji">📋</div><p>No bookings yet.</p></div></div>
+</aside>
+
+<!-- Toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

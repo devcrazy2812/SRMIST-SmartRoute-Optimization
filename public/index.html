@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRMIST Intelligent Navigator</title>
+    <!-- Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-accents">
+        <div class="blob blob1"></div>
+        <div class="blob blob2"></div>
+    </div>
+
+    <main class="dashboard-layout">
+        <div class="left-panel">
+            <header>
+                <h1>SmartRoute <span class="gradient-text">SRMIST</span></h1>
+                <p>Advanced AI-Powered Routing Engine</p>
+            </header>
+
+            <section class="card control-pannel">
+                <div class="input-group">
+                    <label for="startNode">Origin</label>
+                    <select id="startNode">
+                        <option value="" disabled selected>Loading hubs...</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="endNode">Destination</label>
+                    <select id="endNode">
+                        <option value="" disabled selected>Loading hubs...</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="preference">Routing Preference</label>
+                    <select id="preference">
+                        <option value="" disabled selected>Loading preferences...</option>
+                    </select>
+                </div>
+
+                <button id="calculateBtn" class="primary-btn">Compute Neural Route</button>
+            </section>
+
+            <section id="resultsSection" class="card result-panel hidden">
+                <div class="route-header">
+                    <h2>Recommended Route</h2>
+                    <div class="cost-badge" id="tripCost">Cost: 0.0</div>
+                </div>
+                
+                <div class="timeline" id="routeTimeline"></div>
+
+                <div class="explanation-box">
+                    <h3><span class="icon">✨</span> System Reasoning</h3>
+                    <p id="explanationText">Analyzing real-time multi-factor variables...</p>
+                </div>
+
+                <div class="feedback-panel">
+                    <p>Apply RL Gradient (Reward):</p>
+                    <div class="feedback-buttons">
+                        <button class="action-btn accept-btn" onclick="submitFeedback(1)">+1 Optimize</button>
+                        <button class="action-btn reject-btn" onclick="submitFeedback(-1)">-1 Penalize</button>
+                    </div>
+                    <div id="feedbackResult" class="feedback-msg hidden"></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="right-panel">
+            <div class="map-control-bar">
+                <h3>Live Interactive Graph</h3>
+                <button id="openAnalytics" class="secondary-btn">📊 View RL Brain</button>
+            </div>
+            
+            <div id="map" class="map-container card"></div>
+        </div>
+    </main>
+
+    <!-- RL Analytics Modal -->
+    <div id="analyticsModal" class="modal hidden">
+        <div class="modal-content card">
+            <span id="closeAnalytics" class="close-btn">&times;</span>
+            <h2>Q-Table Analytics</h2>
+            <p class="subtitle">Live Reinforcement Learning State Matrix</p>
+            
+            <div class="table-container">
+                <table id="qTable">
+                    <thead>
+                        <tr>
+                            <th>State (Origin)</th>
+                            <th>Action (Next Node)</th>
+                            <th>Q-Value (Learned Bias)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="qTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="script.js"></script>
+</body>
+</html>

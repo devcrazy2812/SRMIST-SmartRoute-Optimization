@@ -1,0 +1,30 @@
+{
+  "nodes": [
+    {"id": "Potheri_Station", "name": "Potheri Railway Station", "lat": 12.8247, "lon": 80.0465},
+    {"id": "SRM_Main_Gate", "name": "SRM Main Gate", "lat": 12.8233, "lon": 80.0443},
+    {"id": "SRM_Hospital", "name": "SRM General Hospital", "lat": 12.8236, "lon": 80.0425},
+    {"id": "UB", "name": "University Building (Admin)", "lat": 12.8230, "lon": 80.0435},
+    {"id": "Java_Green", "name": "Java Green Food Court", "lat": 12.8210, "lon": 80.0440},
+    {"id": "Library", "name": "Central Library", "lat": 12.8215, "lon": 80.0420},
+    {"id": "Tech_Park", "name": "Tech Park", "lat": 12.8212, "lon": 80.0400},
+    {"id": "Architecture_Block", "name": "School of Architecture", "lat": 12.8200, "lon": 80.0385},
+    {"id": "Abode", "name": "Abode Hostel (M Block)", "lat": 12.8185, "lon": 80.0390},
+    {"id": "Estancia", "name": "Estancia IT Park", "lat": 12.8150, "lon": 80.0350}
+  ],
+  "edges": [
+    {"from": "Potheri_Station", "to": "SRM_Main_Gate", "distance": 0.4, "time": 5, "traffic": 0.8},
+    {"from": "Potheri_Station", "to": "SRM_Hospital", "distance": 0.2, "time": 3, "traffic": 0.6},
+    {"from": "SRM_Main_Gate", "to": "UB", "distance": 0.3, "time": 4, "traffic": 0.7},
+    {"from": "SRM_Main_Gate", "to": "Java_Green", "distance": 0.5, "time": 7, "traffic": 0.5},
+    {"from": "SRM_Hospital", "to": "UB", "distance": 0.4, "time": 6, "traffic": 0.4},
+    {"from": "UB", "to": "Library", "distance": 0.2, "time": 3, "traffic": 0.2},
+    {"from": "UB", "to": "Tech_Park", "distance": 0.6, "time": 8, "traffic": 0.9},
+    {"from": "Java_Green", "to": "Tech_Park", "distance": 0.3, "time": 4, "traffic": 0.6},
+    {"from": "Java_Green", "to": "Library", "distance": 0.3, "time": 4, "traffic": 0.3},
+    {"from": "Tech_Park", "to": "Architecture_Block", "distance": 0.5, "time": 6, "traffic": 0.3},
+    {"from": "Library", "to": "Architecture_Block", "distance": 0.4, "time": 5, "traffic": 0.1},
+    {"from": "Tech_Park", "to": "Abode", "distance": 0.8, "time": 12, "traffic": 0.7},
+    {"from": "Architecture_Block", "to": "Estancia", "distance": 1.2, "time": 15, "traffic": 0.5},
+    {"from": "Abode", "to": "Estancia", "distance": 0.5, "time": 7, "traffic": 0.4}
+  ]
+}
